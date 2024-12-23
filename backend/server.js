@@ -25,6 +25,7 @@ const statsRouter = require("./routes/stats");
 const backupRouter = require("./routes/backup");
 const logRouter = require("./routes/logging");
 const utilsRouter = require("./routes/utils");
+const deletionRouter = require("./routes/deletion");
 
 // tasks
 const ActivityMonitor = require("./tasks/ActivityMonitor");
@@ -165,6 +166,10 @@ app.use("/utils", authenticate, utilsRouter, () => {
   /*  #swagger.tags = ['Utils']*/
 }); // mount the API router at /utils, with JWT middleware
 
+app.use("/deletion", authenticate, deletionRouter, () => {
+  /*  #swagger.tags = ['Deletion']*/
+}); // mount the API router at /deletion, with JWT middleware
+
 // Swagger
 app.use("/swagger", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
@@ -245,6 +250,7 @@ try {
         tasks.FullSyncTask();
         tasks.RecentlyAddedItemsSyncTask();
         tasks.BackupTask();
+        tasks.DeletionRulesTask.start(null, 3600000); // Run deletion rules check every hour
       });
     });
   });

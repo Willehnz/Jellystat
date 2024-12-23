@@ -1,5 +1,4 @@
 import Home from "./pages/home";
-
 import Settings from "./pages/settings";
 import Users from "./pages/users";
 import UserInfo from "./pages/components/user-info";
@@ -7,10 +6,10 @@ import Libraries from "./pages/libraries";
 import LibraryInfo from "./pages/components/library-info";
 import ItemInfo from "./pages/components/item-info";
 import About from "./pages/about";
-
 import TestingRoutes from "./pages/testing";
 import Activity from "./pages/activity";
 import Statistics from "./pages/statistics";
+import DeletionRules from "./pages/deletion_rules";
 
 const routes = [
   {
@@ -56,6 +55,11 @@ const routes = [
   {
     path: "/activity",
     element: <Activity />,
+    exact: true,
+  },
+  {
+    path: "/deletion-rules",
+    element: <DeletionRules />,
     exact: true,
   },
   {

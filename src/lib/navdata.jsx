@@ -7,6 +7,7 @@ import SettingsFillIcon from 'remixicon-react/SettingsFillIcon';
 import GalleryFillIcon from 'remixicon-react/GalleryFillIcon';
 import UserFillIcon from 'remixicon-react/UserFillIcon';
 import InformationFillIcon from 'remixicon-react/InformationFillIcon';
+import DeleteBinFillIcon from 'remixicon-react/DeleteBinFillIcon';
 import { Trans } from 'react-i18next';
 
 
@@ -44,18 +45,20 @@ export const navData = [
 
     {
         id: 6,
+        icon: <DeleteBinFillIcon />,
+        text: <Trans i18nKey="MENU_TABS.DELETION_RULES" />,
+        link: "deletion-rules"
+    },
+    {
+        id: 7,
         icon: <SettingsFillIcon />,
         text: <Trans i18nKey="MENU_TABS.SETTINGS" />,
         link: "settings"
-    }
-    ,
-
+    },
     {
-        id: 7,
+        id: 8,
         icon: <InformationFillIcon />,
         text: <Trans i18nKey="MENU_TABS.ABOUT" />,
         link: "about"
     }
-
 ]
-
