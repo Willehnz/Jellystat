@@ -829,6 +829,180 @@ router.use((req, res) => {
   res.status(404).send({ error: "Not Found" });
 });
 
+async function partialSync(triggertype) {
+  const config = await new configClass().getConfig();
+
+  const uuid = randomUUID();
+  syncTask = { loggedData: [], uuid: uuid, wsKey: "PartialSyncTask", taskName: TaskName.PARTIAL_SYNC };
+  try {
+    sendUpdate(syncTask.wsKey, { type: "Start", message: triggertype + " " + TaskName.PARTIAL_SYNC + " Started" });
+    await logging.insertLog(uuid, triggertype, TaskName.PARTIAL_SYNC);
+
+    if (config.error) {
+      syncTask.loggedData.push({ Message: config.error });
+      await logging.updateLog(syncTask.uuid, syncTask.loggedData, TaskState.FAILED);
+      return;
+    }
+
+    //syncUserData
+    await syncUserData();
+
+    let libraries = await API.getLibraries();
+    if (libraries.length === 0) {
+      syncTask.loggedData.push({ Message: "Error: No Libraries found to sync." });
+      await logging.updateLog(syncTask.uuid, syncTask.loggedData, TaskState.FAILED);
+      sendUpdate(syncTask.wsKey, { type: "Success", message: triggertype + " " + TaskName.PARTIAL_SYNC + " Completed" });
+      return;
+    }
+
+    const excluded_libraries = config.settings.ExcludedLibraries || [];
+
+    let filtered_libraries = libraries.filter((library) => !excluded_libraries.includes(library.Id));
+    let existing_excluded_libraries = libraries.filter((library) => excluded_libraries.includes(library.Id));
+
+    //syncLibraryFolders
+    await syncLibraryFolders(filtered_libraries, existing_excluded_libraries);
+
+    syncTask.loggedData.push({ color: "lawngreen", Message: "Syncing... 3/4" });
+    syncTask.loggedData.push({ color: "yellow", Message: "Beginning Media Sync" });
+
+    //clear data from memory as its no longer needed
+    libraries = null;
+
+    //item sync counters
+    let insertedItemsCount = 0;
+    let updatedItemsCount = 0;
+    let insertedSeasonsCount = 0;
+    let updatedSeasonsCount = 0;
+    let insertedEpisodeCount = 0;
+    let updatedEpisodeCount = 0;
+
+    //item info sync counters
+    let insertItemInfoCount = 0;
+    let insertEpisodeInfoCount = 0;
+    let updateItemInfoCount = 0;
+    let updateEpisodeInfoCount = 0;
+
+    //for each item in library run get item using that id as the ParentId
+    for (let i = 0; i < filtered_libraries.length; i++) {
+      let startIndex = 0;
+      let increment = 200;
+      const item = filtered_libraries[i];
+      const wsMessage = "Syncing Library : " + item.Name + ` (${i + 1}/${filtered_libraries.length})`;
+      sendUpdate(syncTask.wsKey, {
+        type: "Update",
+        message: wsMessage,
+      });
+
+      let libraryItems = await API.getItemsFromParentId({
+        id: item.Id,
+        ws: sendUpdate,
+        syncTask: syncTask,
+        wsMessage: wsMessage,
+        params: {
+          startIndex: startIndex,
+          increment: increment,
+        },
+      });
+
+      while (libraryItems.length != 0) {
+        if (libraryItems.length === 0 && startIndex === 0) {
+          syncTask.loggedData.push({ Message: "Error: No Items found for Library : " + item.Name });
+          break;
+        }
+
+        const libraryItemsWithParent = libraryItems.map((items) => ({
+          ...items,
+          ...{ ParentId: item.Id },
+        }));
+
+        let library_items = libraryItemsWithParent.filter((item) => ["Movie", "Audio", "Series"].includes(item.Type));
+        let seasons = libraryItemsWithParent.filter((item) => ["Season"].includes(item.Type));
+        let episodes = libraryItemsWithParent.filter((item) => ["Episode"].includes(item.Type));
+
+        if (library_items.length > 0) {
+          let counts = await syncLibraryItems(library_items);
+          insertedItemsCount += Number(counts.insertedItemsCount);
+          updatedItemsCount += Number(counts.updatedItemsCount);
+        }
+
+        if (seasons.length > 0) {
+          let count = await syncSeasons(seasons);
+          insertedSeasonsCount += Number(count.insertSeasonsCount);
+          updatedSeasonsCount += Number(count.updateSeasonsCount);
+        }
+
+        if (episodes.length > 0) {
+          let count = await syncEpisodes(episodes);
+          insertedEpisodeCount += Number(count.insertEpisodeCount);
+          updatedEpisodeCount += Number(count.updateEpisodeCount);
+        }
+
+        let infoCount = await syncItemInfo([...seasons, ...episodes], library_items);
+        insertItemInfoCount += Number(infoCount.insertItemInfoCount);
+        updateItemInfoCount += Number(infoCount.updateItemInfoCount);
+        insertEpisodeInfoCount += Number(infoCount.insertEpisodeInfoCount);
+        updateEpisodeInfoCount += Number(infoCount.updateEpisodeInfoCount);
+
+        library_items = null;
+        seasons = null;
+        episodes = null;
+
+        startIndex += increment;
+
+        libraryItems = await API.getItemsFromParentId({
+          id: item.Id,
+          ws: sendUpdate,
+          syncTask: syncTask,
+          wsMessage: wsMessage,
+          params: {
+            startIndex: startIndex,
+            increment: increment,
+          },
+        });
+      }
+
+      sendUpdate(syncTask.wsKey, { type: "Update", message: "Data Fetched for Library : " + item.Name });
+    }
+
+    syncTask.loggedData.push({
+      color: "dodgerblue",
+      Message: (insertedItemsCount > 0 ? insertedItemsCount : 0) + " Items inserted. " + updatedItemsCount + " Item Info Updated",
+    });
+
+    syncTask.loggedData.push({
+      color: "dodgerblue",
+      Message:
+        (insertedSeasonsCount > 0 ? insertedSeasonsCount : 0) + " Seasons inserted. " + updatedSeasonsCount + " Seasons Updated",
+    });
+
+    syncTask.loggedData.push({
+      color: "dodgerblue",
+      Message:
+        (insertedEpisodeCount > 0 ? insertedEpisodeCount : 0) +
+        " Episodes inserted. " +
+        updatedEpisodeCount +
+        " Episodes Updated",
+    });
+
+    syncTask.loggedData.push({ color: "yellow", Message: "Media Sync Complete" });
+
+    filtered_libraries = null;
+    existing_excluded_libraries = null;
+
+    await removeOrphanedData();
+    await migrateArchivedActivty();
+    await updateLibraryStatsData();
+
+    await logging.updateLog(syncTask.uuid, syncTask.loggedData, TaskState.SUCCESS);
+    sendUpdate(syncTask.wsKey, { type: "Success", message: triggertype + " Sync Completed" });
+  } catch (error) {
+    syncTask.loggedData.push({ color: "red", Message: getErrorLineNumber(error) + ": Error: " + error });
+    await logging.updateLog(syncTask.uuid, syncTask.loggedData, TaskState.FAILED);
+    sendUpdate(syncTask.wsKey, { type: "Error", message: triggertype + " Sync Halted with Errors" });
+  }
+}
+
 module.exports = {
   router,
   fullSync,
