@@ -1,6 +1,22 @@
-# Jellystat
+# Jellystat (Enhanced Deletion Features Fork)
 
-A comprehensive statistics and monitoring application for Jellyfin media servers. This application provides detailed analytics, user activity monitoring, library statistics, and automated media management through a modern web interface.
+This is a fork of [CyferShepard's Jellystat](https://github.com/CyferShepard/Jellystat) with enhanced media management capabilities, particularly focused on automated deletion features. This version adds comprehensive media cleanup tools while maintaining all the original statistics and monitoring capabilities.
+
+## What's New in this Fork?
+
+- **Advanced Media Deletion System**
+  - Rule-based cleanup with preview capabilities
+  - Show/Episode level management
+  - Integration with Sonarr/Radarr/Jellyseerr
+  - Discord notifications for deletions
+  - Dry-run testing before actual deletion
+  - API connection testing for all services
+
+- **Enhanced External Service Integration**
+  - Direct Sonarr/Radarr cleanup
+  - Jellyseerr request management
+  - Discord webhook notifications
+  - Connection testing tools
 
 ## Core Features
 
@@ -73,6 +89,8 @@ A comprehensive statistics and monitoring application for Jellyfin media servers
 
 ### Docker Deployment (Recommended)
 
+This fork has its own Docker image. To use it:
+
 1. Create a docker-compose.yml:
 ```yaml
 version: '3'
@@ -89,7 +107,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   jellystat:
-    image: cyfershepard/jellystat:latest
+    image: willehnz/jellystat:latest
     container_name: jellystat
     restart: unless-stopped
     environment:
@@ -99,6 +117,11 @@ services:
       POSTGRES_PORT: 5432
       JWT_SECRET: your_secure_jwt_key
       TZ: Your/Timezone
+      # Optional: Add these for deletion features
+      SONARR_API_KEY: your_sonarr_key
+      RADARR_API_KEY: your_radarr_key
+      JELLYSEERR_API_KEY: your_jellyseerr_key
+      DISCORD_WEBHOOK_URL: your_discord_webhook
     volumes:
       - jellystat-backup-data:/app/backend/backup-data
     ports:
@@ -197,9 +220,9 @@ docker-compose up -d
 
 ## Development Setup
 
-1. Clone the repository:
+1. Clone this fork:
 ```bash
-git clone https://github.com/CyferShepard/Jellystat.git
+git clone https://github.com/Willehnz/Jellystat.git
 cd Jellystat
 ```
 
@@ -219,40 +242,21 @@ cp backend/.env.example backend/.env
 npm run start-dev
 ```
 
-## Support
-
-- Submit issues via [GitHub Issues](https://github.com/CyferShepard/Jellystat/issues)
-- Join us in our [Discord](https://discord.gg/9SMBj2RyEe)
-
-## Upgrading
+## Upgrading from Original Jellystat
 
 ### Docker Installation
 
-1. Pull the latest image:
+1. Switch to this fork's image:
 ```bash
-docker pull cyfershepard/jellystat:latest
-```
-
-2. Update your docker-compose.yml:
-   - Add the new external service environment variables if you plan to use deletion features:
-```yaml
-  jellystat:
-    environment:
-      # Existing variables...
-      # Optional: Add these for deletion features
-      SONARR_API_KEY: your_sonarr_key
-      RADARR_API_KEY: your_radarr_key
-      JELLYSEERR_API_KEY: your_jellyseerr_key
-      DISCORD_WEBHOOK_URL: your_discord_webhook
-```
-
-3. Restart the containers:
-```bash
+# Stop existing containers
 docker-compose down
+
+# Update docker-compose.yml to use willehnz/jellystat:latest
+
+# Pull and start new image
+docker pull willehnz/jellystat:latest
 docker-compose up -d
 ```
-
-The database migrations will run automatically on startup, adding the new deletion-related tables.
 
 ### Manual Installation
 
@@ -261,9 +265,12 @@ The database migrations will run automatically on startup, adding the new deleti
 npm run stop
 ```
 
-2. Update the code:
+2. Switch to this fork:
 ```bash
-git pull origin main
+# Backup your data first!
+git remote add fork https://github.com/Willehnz/Jellystat.git
+git fetch fork
+git checkout fork/main
 ```
 
 3. Install new dependencies:
