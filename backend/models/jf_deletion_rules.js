@@ -111,26 +111,132 @@ class DeletionRules {
     }
   }
 
-  async processRules() {
+  async previewRules() {
+    try {
+      const rules = await this.getRules();
+      const preview = [];
+
+      for (const rule of rules) {
+        if (!rule.enabled) {
+          preview.push({
+            rule_name: rule.rule_name,
+            status: 'disabled',
+            items: []
+          });
+          continue;
+        }
+
+        const rulePreview = await this.previewRule(rule.ID);
+        preview.push(rulePreview);
+      }
+
+      return preview;
+    } catch (error) {
+      console.error("[DELETION-RULES] Error previewing rules:", error);
+      throw error;
+    }
+  }
+
+  async previewRule(ruleId) {
+    try {
+      const rule = await this.getRuleById(ruleId);
+      if (!rule) throw new Error("Rule not found");
+
+      const itemsToProcess = await this.findItemsForDeletion(rule);
+      const itemsGrouped = {
+        to_delete: [],
+        warning_soon: [],
+        protected: []
+      };
+
+      for (const item of itemsToProcess) {
+        const daysUntilDeletion = this.calculateDaysUntilDeletion(item, rule);
+        const itemInfo = {
+          title: item.title,
+          days_since_watched: item.days_since_watched,
+          days_until_deletion: daysUntilDeletion,
+          last_watched: item.last_watch_date
+        };
+
+        if (daysUntilDeletion <= 0) {
+          itemsGrouped.to_delete.push(itemInfo);
+        } else if (daysUntilDeletion <= rule.warning_days) {
+          itemsGrouped.warning_soon.push(itemInfo);
+        } else {
+          itemsGrouped.protected.push(itemInfo);
+        }
+      }
+
+      return {
+        rule_name: rule.rule_name,
+        library_name: rule.library_name,
+        media_type: rule.media_type,
+        days_threshold: rule.days_since_watched,
+        warning_days: rule.warning_days,
+        status: rule.enabled ? 'enabled' : 'disabled',
+        summary: {
+          total_items: itemsToProcess.length,
+          to_delete: itemsGrouped.to_delete.length,
+          warning_soon: itemsGrouped.warning_soon.length,
+          protected: itemsGrouped.protected.length
+        },
+        items: itemsGrouped
+      };
+    } catch (error) {
+      console.error("[DELETION-RULES] Error previewing rule:", error);
+      throw error;
+    }
+  }
+
+  async processRules(dryRun = false) {
     try {
       const rules = await this.getRules();
       const config = await this.config.getConfig();
       const externalServices = JSON.parse(config.external_services || '{}');
+      const results = [];
 
       for (const rule of rules) {
         if (!rule.enabled) continue;
 
         const itemsToDelete = await this.findItemsForDeletion(rule);
+        const ruleResults = {
+          rule_name: rule.rule_name,
+          processed: [],
+          warnings: []
+        };
+
         for (const item of itemsToDelete) {
           const daysUntilDeletion = this.calculateDaysUntilDeletion(item, rule);
           
           if (daysUntilDeletion <= 0) {
-            await this.deleteItem(item, rule, externalServices);
+            if (!dryRun) {
+              await this.deleteItem(item, rule, externalServices);
+            }
+            ruleResults.processed.push({
+              title: item.title,
+              action: dryRun ? 'would_delete' : 'deleted',
+              days_since_watched: item.days_since_watched
+            });
           } else if (daysUntilDeletion <= rule.warning_days) {
-            await this.sendDeletionWarning(item, rule, daysUntilDeletion, externalServices);
+            if (!dryRun) {
+              await this.sendDeletionWarning(item, rule, daysUntilDeletion, externalServices);
+            }
+            ruleResults.warnings.push({
+              title: item.title,
+              days_until_deletion: daysUntilDeletion,
+              action: dryRun ? 'would_warn' : 'warned'
+            });
           }
         }
+
+        results.push(ruleResults);
       }
+
+      return {
+        mode: dryRun ? 'dry_run' : 'live',
+        timestamp: new Date().toISOString(),
+        results
+      };
     } catch (error) {
       console.error("[DELETION-RULES] Error processing rules:", error);
       throw error;

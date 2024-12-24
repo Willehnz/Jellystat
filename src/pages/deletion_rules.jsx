@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -27,7 +28,12 @@ import {
   Tab,
   Tabs
 } from '@mui/material';
-import { Delete as DeleteIcon, Edit as EditIcon, Add as AddIcon } from '@mui/icons-material';
+import { 
+  Delete as DeleteIcon, 
+  Edit as EditIcon, 
+  Add as AddIcon,
+  Preview as PreviewIcon 
+} from '@mui/icons-material';
 import axios from '../lib/axios_instance';
 import { toast } from 'react-toastify';
 
@@ -52,6 +58,10 @@ export default function DeletionRules() {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentRule, setCurrentRule] = useState(null);
   const [tabValue, setTabValue] = useState(0);
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [selectedRule, setSelectedRule] = useState(null);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -149,12 +159,39 @@ export default function DeletionRules() {
     }
   };
 
-  const handleProcessRules = async () => {
+  const handlePreviewRule = async (rule) => {
+    setSelectedRule(rule);
+    setPreviewLoading(true);
+    setPreviewDialogOpen(true);
     try {
-      await axios.post('/deletion/process');
-      toast.success('Rule processing triggered successfully');
+      const response = await axios.get(`/deletion/preview/${rule.ID}`);
+      setPreviewData(response.data);
     } catch (error) {
-      toast.error('Error processing rules');
+      toast.error('Error loading preview');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleProcessRule = async (ruleId, isDryRun = true) => {
+    try {
+      const response = await axios.post(`/deletion/process?dryRun=${isDryRun}`);
+      toast.success(isDryRun ? 'Dry run completed successfully' : 'Rule processing started');
+      if (isDryRun) {
+        // Update preview data with dry run results
+        const result = response.data.results.find(r => r.rule_name === selectedRule.rule_name);
+        if (result) {
+          setPreviewData(prev => ({
+            ...prev,
+            dry_run_results: result
+          }));
+        }
+      } else {
+        setPreviewDialogOpen(false);
+        loadData();
+      }
+    } catch (error) {
+      toast.error(isDryRun ? 'Error running dry run' : 'Error processing rule');
     }
   };
 
@@ -168,6 +205,167 @@ export default function DeletionRules() {
         </Tabs>
       </Box>
 
+      {/* Preview Dialog */}
+      <Dialog 
+        open={previewDialogOpen} 
+        onClose={() => setPreviewDialogOpen(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>
+          Rule Preview: {selectedRule?.rule_name}
+        </DialogTitle>
+        <DialogContent>
+          {previewLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : previewData && (
+            <Box sx={{ mt: 2 }}>
+              <Grid container spacing={3}>
+                {/* Summary Card */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>Summary</Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={3}>
+                          <Typography color="error">
+                            To Delete: {previewData.summary.to_delete}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={3}>
+                          <Typography color="warning.main">
+                            Warning Soon: {previewData.summary.warning_soon}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={3}>
+                          <Typography color="success.main">
+                            Protected: {previewData.summary.protected}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={3}>
+                          <Typography>
+                            Total Items: {previewData.summary.total_items}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Items to Delete */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" color="error" gutterBottom>
+                        Items to be Deleted
+                      </Typography>
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Title</TableCell>
+                              <TableCell>Days Since Watched</TableCell>
+                              <TableCell>Last Watched</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {previewData.items.to_delete.map((item, index) => (
+                              <TableRow key={index}>
+                                <TableCell>{item.title}</TableCell>
+                                <TableCell>{item.days_since_watched}</TableCell>
+                                <TableCell>
+                                  {new Date(item.last_watched).toLocaleDateString()}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Warning Soon Items */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" color="warning.main" gutterBottom>
+                        Items Approaching Deletion
+                      </Typography>
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Title</TableCell>
+                              <TableCell>Days Until Deletion</TableCell>
+                              <TableCell>Last Watched</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {previewData.items.warning_soon.map((item, index) => (
+                              <TableRow key={index}>
+                                <TableCell>{item.title}</TableCell>
+                                <TableCell>{item.days_until_deletion}</TableCell>
+                                <TableCell>
+                                  {new Date(item.last_watched).toLocaleDateString()}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Dry Run Results */}
+                {previewData.dry_run_results && (
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          Dry Run Results
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          These are the actions that would be taken if the rule is applied:
+                        </Typography>
+                        <Box sx={{ mt: 2 }}>
+                          <Typography>
+                            Items to be deleted: {previewData.dry_run_results.processed.length}
+                          </Typography>
+                          <Typography>
+                            Warning notifications: {previewData.dry_run_results.warnings.length}
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewDialogOpen(false)}>Close</Button>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={() => handleProcessRule(selectedRule?.ID, true)}
+          >
+            Run Dry Run
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={() => handleProcessRule(selectedRule?.ID, false)}
+          >
+            Apply Rule
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <TabPanel value={tabValue} index={0}>
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between' }}>
           <Button
@@ -176,12 +374,6 @@ export default function DeletionRules() {
             onClick={() => handleOpenDialog()}
           >
             Add Rule
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={handleProcessRules}
-          >
-            Process Rules Now
           </Button>
         </Box>
 
@@ -212,6 +404,9 @@ export default function DeletionRules() {
                   <TableCell>
                     <IconButton onClick={() => handleOpenDialog(rule)}>
                       <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handlePreviewRule(rule)}>
+                      <PreviewIcon />
                     </IconButton>
                     <IconButton onClick={() => handleDelete(rule.ID)}>
                       <DeleteIcon />

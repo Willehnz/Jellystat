@@ -145,11 +145,37 @@ router.get("/stats", async (req, res) => {
   }
 });
 
+// Preview deletion rules (dry run)
+router.get("/preview", async (req, res) => {
+  try {
+    const preview = await DeletionRules.previewRules();
+    res.json(preview);
+  } catch (error) {
+    console.error("[DELETION-ROUTES] Error previewing rules:", error);
+    res.status(500).json({ error: "Failed to preview deletion rules" });
+  }
+});
+
+// Preview specific rule
+router.get("/preview/:id", async (req, res) => {
+  try {
+    const preview = await DeletionRules.previewRule(req.params.id);
+    res.json(preview);
+  } catch (error) {
+    console.error("[DELETION-ROUTES] Error previewing rule:", error);
+    res.status(500).json({ error: "Failed to preview deletion rule" });
+  }
+});
+
 // Manually trigger rule processing
 router.post("/process", async (req, res) => {
   try {
-    await DeletionRules.processRules();
-    res.json({ message: "Rule processing triggered successfully" });
+    const dryRun = req.query.dryRun === 'true';
+    const result = await DeletionRules.processRules(dryRun);
+    res.json({
+      message: dryRun ? "Dry run completed successfully" : "Rule processing triggered successfully",
+      result
+    });
   } catch (error) {
     console.error("[DELETION-ROUTES] Error processing rules:", error);
     res.status(500).json({ error: "Failed to process deletion rules" });
