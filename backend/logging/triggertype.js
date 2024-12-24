@@ -1,6 +1,7 @@
-const triggertype = {
-    Automatic: 'Automatic',
-    Manual: 'Manual'
-  };
-  
-  module.exports = triggertype;
+const TriggerType = {
+    AUTOMATIC: 'Automatic',
+    MANUAL: 'Manual',
+    SCHEDULED: 'Scheduled'
+};
+
+module.exports = { TriggerType };

@@ -1,27 +1,25 @@
 const db = require("../db");
 const moment = require("moment");
 const sync = require("../routes/sync");
-const taskName = require("../logging/taskName");
-const taskstate = require("../logging/taskstate");
-const triggertype = require("../logging/triggertype");
+const { TaskName } = require("../logging/taskName");
+const { TaskState } = require("../logging/taskstate");
+const { TriggerType } = require("../logging/triggertype");
 
 async function RecentlyAddedItemsSyncTask() {
   try {
     await db.query(
-      `UPDATE jf_logging SET "Result"='${taskstate.FAILED}' WHERE "Name"='${taskName.partialsync}' AND "Result"='${taskstate.RUNNING}'`
+      `UPDATE jf_logging SET "Result"='${TaskState.FAILED}' WHERE "Name"='${TaskName.PARTIAL_SYNC}' AND "Result"='${TaskState.RUNNING}'`
     );
   } catch (error) {
     console.log("Error Cleaning up Sync Tasks: " + error);
   }
 
   let interval = 11000;
-
   let taskDelay = 60; //in minutes
 
   async function fetchTaskSettings() {
     try {
       //get interval from db
-
       const settingsjson = await db.query('SELECT settings FROM app_config where "ID"=1').then((res) => res.rows);
 
       if (settingsjson.length > 0) {
@@ -65,30 +63,31 @@ async function RecentlyAddedItemsSyncTask() {
       const last_execution = await db
         .query(
           `SELECT "TimeRun","Result"
-                                          FROM public.jf_logging
-                                          WHERE "Name"='${taskName.partialsync}'
-                                          ORDER BY "TimeRun" DESC
-                                          LIMIT 1`
+           FROM public.jf_logging
+           WHERE "Name"='${TaskName.PARTIAL_SYNC}'
+           ORDER BY "TimeRun" DESC
+           LIMIT 1`
         )
         .then((res) => res.rows);
 
       const last_execution_FullSync = await db
         .query(
           `SELECT "TimeRun","Result"
-                                            FROM public.jf_logging
-                                            WHERE "Name"='${taskName.fullsync}'
-                                            AND "Result"='${taskstate.RUNNING}'
-                                            ORDER BY "TimeRun" DESC
-                                            LIMIT 1`
+           FROM public.jf_logging
+           WHERE "Name"='${TaskName.FULL_SYNC}'
+           AND "Result"='${TaskState.RUNNING}'
+           ORDER BY "TimeRun" DESC
+           LIMIT 1`
         )
         .then((res) => res.rows);
+
       if (last_execution.length !== 0) {
         await fetchTaskSettings();
         let last_execution_time = moment(last_execution[0].TimeRun).add(taskDelay, "minutes");
 
         if (
           !current_time.isAfter(last_execution_time) ||
-          last_execution[0].Result === taskstate.RUNNING ||
+          last_execution[0].Result === TaskState.RUNNING ||
           last_execution_FullSync.length > 0
         ) {
           intervalTask = setInterval(intervalCallback, interval);
@@ -97,7 +96,7 @@ async function RecentlyAddedItemsSyncTask() {
       }
 
       console.log("Running Recently Added Scheduled Sync");
-      await sync.partialSync(triggertype.Automatic);
+      await sync.partialSync(TriggerType.SCHEDULED);
       console.log("Scheduled Recently Added Sync Complete");
     } catch (error) {
       console.log(error);

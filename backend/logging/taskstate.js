@@ -1,7 +1,10 @@
-const taskstate = {
+const TaskState = {
     SUCCESS: 'Success',
     FAILED: 'Failed',
     RUNNING: 'Running',
-  };
-  
-  module.exports = taskstate;
+    ERROR: 'Error',
+    STOPPED: 'Stopped',
+    COMPLETED: 'Completed'
+};
+
+module.exports = { TaskState };
