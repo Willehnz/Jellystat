@@ -9,8 +9,11 @@ services:
       POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
-    command: ["postgres", "-c", "password_encryption=md5"]
+    command: >
+      bash -c "echo '
+      host all all all md5
+      local all all trust
+      ' > /var/lib/postgresql/data/pg_hba.conf && postgres -c password_encryption=md5"
     logging:
       driver: "json-file"
       options:
