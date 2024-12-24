@@ -8,8 +8,14 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: jfstat
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "10m"
 
   jellystat:
     image: willehnz/jellystat:latest
@@ -20,6 +26,7 @@ services:
       POSTGRES_PASSWORD: mypassword
       POSTGRES_IP: jellystat-db
       POSTGRES_PORT: 5432
+      POSTGRES_DB: jfstat
       JWT_SECRET: "my-secret-jwt-key"
       TZ: Auckland # timezone (ex: Europe/Paris)
     volumes:
@@ -28,6 +35,11 @@ services:
       - "3000:3000"
     depends_on:
       - jellystat-db
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: "10m"
       
 networks:
   default:
@@ -35,9 +47,3 @@ networks:
 volumes:
   postgres-data:
   jellystat-backup-data:
-
-logging:
-  driver: "json-file"
-  options:
-    max-file: "5" # number of files or file count
-    max-size: "10m" # file size
