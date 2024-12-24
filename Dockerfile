@@ -17,7 +17,7 @@ RUN npm run build
 FROM node:slim
 
 RUN apt-get update && \
-    apt-get install -yqq --no-install-recommends wget && \
+    apt-get install -yqq --no-install-recommends wget postgresql-client && \
     apt-get autoremove && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

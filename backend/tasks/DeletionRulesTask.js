@@ -2,7 +2,7 @@ const DeletionRules = require("../models/jf_deletion_rules");
 const { TaskState } = require("../logging/taskstate");
 const { TaskName } = require("../logging/taskName");
 const { TriggerType } = require("../logging/triggertype");
-const logging = require("../models/jf_logging");
+const logging = require("../classes/logging");
 
 class DeletionRulesTask {
   constructor() {

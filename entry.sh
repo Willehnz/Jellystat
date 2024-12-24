@@ -30,5 +30,14 @@ load_secrets() {
 
 # Load secrets
 load_secrets
+
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL to be ready..."
+until pg_isready -h "$POSTGRES_IP" -p "$POSTGRES_PORT" -U "$POSTGRES_USER"; do
+  echo "PostgreSQL is unavailable - sleeping"
+  sleep 1
+done
+echo "PostgreSQL is up - executing command"
+
 # Launch Jellystat
 npm run start
