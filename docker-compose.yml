@@ -18,7 +18,7 @@ services:
         max-size: "10m"
 
   jellystat:
-    image: jellystat-enhanced:latest  # Using local build for now
+    image: willehnz/jellystat:latest  # Using FORK
     container_name: jellystat
     restart: unless-stopped
     environment:
@@ -27,7 +27,7 @@ services:
       POSTGRES_IP: jellystat-db
       POSTGRES_PORT: 5432
       JWT_SECRET: "my-secret-jwt-key"
-      TZ: mytimezone # timezone (ex: Europe/Paris)
+      TZ: Auckland # timezone (ex: Europe/Paris)
     volumes:
       - jellystat-backup-data:/app/backend/backup-data
     ports:
