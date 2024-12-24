@@ -184,6 +184,17 @@ docker-compose up -d
 | POSTGRES_DB | No | jfstat | Database name |
 | REJECT_SELF_SIGNED_CERTIFICATES | No | true | SSL certificate validation |
 
+### External Service Variables (Optional)
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| SONARR_API_KEY | No | null | Sonarr API key for TV show deletion |
+| RADARR_API_KEY | No | null | Radarr API key for movie deletion |
+| JELLYSEERR_API_KEY | No | null | Jellyseerr API key for request cleanup |
+| DISCORD_WEBHOOK_URL | No | null | Discord webhook for deletion notifications |
+| SONARR_URL | No | null | Sonarr server URL (e.g., http://sonarr:8989) |
+| RADARR_URL | No | null | Radarr server URL (e.g., http://radarr:7878) |
+| JELLYSEERR_URL | No | null | Jellyseerr server URL (e.g., http://jellyseerr:5055) |
+
 ## Development Setup
 
 1. Clone the repository:
@@ -212,6 +223,98 @@ npm run start-dev
 
 - Submit issues via [GitHub Issues](https://github.com/CyferShepard/Jellystat/issues)
 - Join us in our [Discord](https://discord.gg/9SMBj2RyEe)
+
+## Upgrading
+
+### Docker Installation
+
+1. Pull the latest image:
+```bash
+docker pull cyfershepard/jellystat:latest
+```
+
+2. Update your docker-compose.yml:
+   - Add the new external service environment variables if you plan to use deletion features:
+```yaml
+  jellystat:
+    environment:
+      # Existing variables...
+      # Optional: Add these for deletion features
+      SONARR_API_KEY: your_sonarr_key
+      RADARR_API_KEY: your_radarr_key
+      JELLYSEERR_API_KEY: your_jellyseerr_key
+      DISCORD_WEBHOOK_URL: your_discord_webhook
+```
+
+3. Restart the containers:
+```bash
+docker-compose down
+docker-compose up -d
+```
+
+The database migrations will run automatically on startup, adding the new deletion-related tables.
+
+### Manual Installation
+
+1. Stop Jellystat:
+```bash
+npm run stop
+```
+
+2. Update the code:
+```bash
+git pull origin main
+```
+
+3. Install new dependencies:
+```bash
+npm install
+```
+
+4. Update your .env file with new variables if needed:
+```bash
+# Optional: Add these for deletion features
+SONARR_API_KEY=your_sonarr_key
+RADARR_API_KEY=your_radarr_key
+JELLYSEERR_API_KEY=your_jellyseerr_key
+DISCORD_WEBHOOK_URL=your_discord_webhook
+```
+
+5. Start Jellystat:
+```bash
+npm run start
+```
+
+### After Upgrading
+
+1. Access the new Deletion Rules section in the sidebar
+2. Configure external services in Settings if using deletion features
+3. Test API connections using the built-in test tools
+4. Create and test deletion rules using the preview feature
+
+### Troubleshooting Upgrade
+
+If you encounter issues after upgrading:
+
+1. Check the logs:
+```bash
+# Docker
+docker logs jellystat
+
+# Manual
+npm run start-server
+```
+
+2. Verify database migrations:
+   - Check if new tables exist (jf_deletion_rules, jf_deletion_history)
+   - Restart the application if migrations didn't run
+
+3. Clear browser cache and reload the application
+
+4. If problems persist:
+   - Back up your database
+   - Remove containers and volumes
+   - Perform a fresh installation
 
 ## License
 
