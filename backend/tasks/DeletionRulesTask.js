@@ -49,12 +49,11 @@ class DeletionRulesTask {
   async processRules(ws) {
     try {
       // Log task start
-      await logging.logTask({
-        task_name: this.taskName,
-        trigger_type: TriggerType.SCHEDULED,
-        task_state: TaskState.RUNNING,
-        message: "Starting deletion rules processing"
-      });
+      await logging.insertLog(
+        this.taskName,
+        TriggerType.SCHEDULED,
+        TaskName.DELETION_RULES
+      );
 
       if (ws) {
         ws(this.wsKey, {
@@ -73,12 +72,11 @@ class DeletionRulesTask {
       }
 
       // Log task completion
-      await logging.logTask({
-        task_name: this.taskName,
-        trigger_type: TriggerType.SCHEDULED,
-        task_state: TaskState.COMPLETED,
-        message: "Deletion rules processing completed"
-      });
+      await logging.updateLog(
+        this.taskName,
+        [{ color: "dodgerblue", Message: "Deletion rules processing completed" }],
+        TaskState.SUCCESS
+      );
     } catch (error) {
       console.error("[DELETION-RULES-TASK] Error processing rules:", error);
       
@@ -90,12 +88,11 @@ class DeletionRulesTask {
       }
 
       // Log task error
-      await logging.logTask({
-        task_name: this.taskName,
-        trigger_type: TriggerType.SCHEDULED,
-        task_state: TaskState.ERROR,
-        message: `Error processing deletion rules: ${error.message}`
-      });
+      await logging.updateLog(
+        this.taskName,
+        [{ color: "red", Message: `Error processing deletion rules: ${error.message}` }],
+        TaskState.ERROR
+      );
 
       this.taskState = TaskState.ERROR;
     }
